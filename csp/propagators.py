@@ -4,6 +4,8 @@
 '''This file will contain different constraint propagators to be used within 
    bt_search.
 
+    note: OpenAI's ChatGPT is used as an aid to draft this code
+    
    propagator == a function with the following template
       propagator(csp, newly_instantiated_variable=None)
            ==> returns (True/False, [(Variable, Value), (Variable, Value) ...]
@@ -77,8 +79,45 @@ def prop_FC(csp, newVar=None):
        only one uninstantiated variable. Remember to keep 
        track of all pruned variable,value pairs and return '''
     #IMPLEMENT
+    pruned = []
+    if newVar:
+        constraints = csp.get_cons_with_var(newVar)
+    else:
+        constraints = csp.get_all_cons()
+
+    for con in constraints:
+        if newVar and not newVar in con.get_scope():
+            continue
+        for var in con.get_scope():
+            if var.is_assigned():
+                continue
+            for val in var.cur_domain():
+                if not con.has_support(var, val):
+                    var.prune_value(val)
+                    pruned.append((var, val))
+                    if var.cur_domain_size() == 0:
+                        return False, pruned
+    return True, pruned
 
 def prop_FI(csp, newVar=None):
     '''Do full inference. If newVar is None we initialize the queue
        with all variables.'''
     #IMPLEMENT
+    pruned = []
+    queue = [(con, var) for con in csp.get_all_cons() for var in con.get_scope() if not var.is_assigned() or var == newVar]
+
+    while queue:
+        con, var = queue.pop(0)
+        for val in var.cur_domain():
+            if not con.has_support(var, val):
+                var.prune_value(val)
+                pruned.append((var, val))
+                if var.cur_domain_size() == 0:
+                    return False, pruned
+                else:
+                    for other_con in csp.get_cons_with_var(var):
+                        for other_var in other_con.get_scope():
+                            if other_var != var and not other_var.is_assigned():
+                                queue.append((other_con, other_var))
+
+    return True, pruned
